@@ -60,6 +60,36 @@ Mean F1 = **0.610**, σ_universality (sample, ddof=1) = **0.126**.
 
 Across all pairs a switch is 6–20× more likely right after punctuation than after non-punctuation tokens, so the baseline mostly fires at clause / sentence boundaries. See notebook Section 8 for per-pair precision/recall and top switch-triggering tokens.
 
+## Multitask model (Update 2)
+
+Shared XLM-R (`xlm-roberta-base`) encoder with two linear heads (switch → 2, duration → 3), trained with the
+multitask loss `L = λ_sw · CE(switch) + λ_dur · CE(duration, ignore_index=-1)`. The prefix-only (causal)
+constraint is enforced by the streaming windows themselves: each example is the prefix `[x_1, …, x_t]` and the
+prediction is read at the last position, so `t` never sees `x_{t+1}`. Loss weights were selected by a val-F1
+sweep (`switch_pos_weight = 8`, `λ_dur = 0.5`).
+
+Anticipatory switch F1 and duration accuracy on the **test** split, across 13 English–X pairs:
+
+| pair | switch F1 | dur acc |
+|---|---:|---:|
+| en-ar  | **0.793** | 0.576 |
+| en-hi  | **0.658** | 0.570 |
+| en-yue | **0.496** | 0.635 |
+| en-zh  | **0.486** | 0.742 |
+| en-ja  | **0.386** | 0.625 |
+| en-ko  | **0.784** | 0.637 |
+| en-ru  | **0.618** | 0.494 |
+| en-es  | **0.740** | 0.735 |
+| en-fr  | **0.783** | 0.642 |
+| en-de  | **0.825** | 0.724 |
+| en-vi  | **0.765** | 0.640 |
+| en-ms  | **0.604** | 0.578 |
+| en-fil | **0.478** | 0.519 |
+
+Mean switch F1 = **0.647**, σ_universality (sample, ddof=1) = **0.147**. The model beats the token-lookup
+baseline on switch F1; the lowest-F1 pairs (ja / zh / yue / fil) are the CJK / low-resource scripts where
+word-level LID and segmentation are hardest.
+
 ## Running the notebook
 
 The SwitchLingua dataset is gated on Hugging Face — accept its terms on the dataset page and authenticate before launching the notebook.
