@@ -90,6 +90,39 @@ Mean switch F1 = **0.647**, σ_universality (sample, ddof=1) = **0.147**. The mo
 baseline on switch F1; the lowest-F1 pairs (ja / zh / yue / fil) are the CJK / low-resource scripts where
 word-level LID and segmentation are hardest.
 
+## mBERT multitask model (Update 2)
+
+Same dual-head architecture, loss and training settings as the XLM-R model above (`switch_pos_weight = 8`,
+`λ_dur = 0.5`, `lr = 2e-5`, 1,500 optimizer steps of 8 × 4 windows), with `bert-base-multilingual-cased` as the
+shared encoder. The mBERT tokenizer is extended with 241 train-split Han characters it cannot encode (`MBERT_ADDED`,
+mostly Cantonese), and the embedding matrix is resized to match (119,788 entries). The code is in notebook Section 6,
+"mBERT multitask model"; the model was trained on a Colab T4 GPU.
+
+Anticipatory switch F1 and duration accuracy on the first 300 **test** batches (19,200 positions):
+
+| pair | switch F1 | dur acc |
+|---|---:|---:|
+| en-ar  | **0.774** | 0.531 |
+| en-hi  | **0.663** | 0.238 |
+| en-yue | **0.506** | 0.635 |
+| en-zh  | **0.566** | 0.716 |
+| en-ja  | **0.347** | 0.609 |
+| en-ko  | **0.821** | 0.655 |
+| en-ru  | **0.561** | 0.428 |
+| en-es  | **0.655** | 0.635 |
+| en-fr  | **0.734** | 0.581 |
+| en-de  | **0.802** | 0.630 |
+| en-vi  | **0.777** | 0.570 |
+| en-ms  | **0.585** | 0.465 |
+| en-fil | **0.468** | 0.281 |
+
+Mean switch F1 = **0.635**, σ_universality (sample, ddof=1) = **0.145**; mean duration accuracy = 0.536, lowest for
+en-hi and en-fil. The first 300 batches cover different rows and positions than in the XLM-R evaluation (mBERT has
+one token per Han character), so the two tables are not directly comparable yet.
+
+The checkpoint (`checkpoints/mbert_multitask.pt`, 680 MB) and the extended tokenizer (`checkpoints/mbert_tokenizer`)
+are not in the repository (`checkpoints/` is git-ignored).
+
 ## Running the notebook
 
 The SwitchLingua dataset is gated on Hugging Face — accept its terms on the dataset page and authenticate before launching the notebook.
