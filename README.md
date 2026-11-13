@@ -4,7 +4,7 @@ CS6140 Machine Learning
 
 **Team 2**: Hsien-Yu Yang, Jiachen Xu, Xinyi Zhang, Zihan Xiong
 
-**Project Update 1 submission**
+**Project Update 2 submission**
 
 The goal is to predict, from the historical prefix `x_1, ..., x_t` only, (i) whether the next token `x_{t+1}` belongs to a different language than `x_t` (binary **switch** label `y_sw`) and (ii) the length bin of the upcoming same-language burst (3-class **duration** label `y_dur` ∈ {0: 1–2 tok, 1: 3–6 tok, 2: 7+ tok}). We evaluate universality across six typologically diverse English–X pairs on the SwitchLingua corpus.
 
@@ -66,59 +66,83 @@ Shared XLM-R (`xlm-roberta-base`) encoder with two linear heads (switch → 2, d
 multitask loss `L = λ_sw · CE(switch) + λ_dur · CE(duration, ignore_index=-1)`. The prefix-only (causal)
 constraint is enforced by the streaming windows themselves: each example is the prefix `[x_1, …, x_t]` and the
 prediction is read at the last position, so `t` never sees `x_{t+1}`. Loss weights were selected by a val-F1
-sweep (`switch_pos_weight = 8`, `λ_dur = 0.5`).
+sweep (`switch_pos_weight = 8`, `λ_dur = 0.5`); the final model is trained for 6,000 optimizer steps of 8 × 4
+windows on a Colab T4 GPU.
 
-Anticipatory switch F1 and duration accuracy on the **test** split, across 13 English–X pairs:
+Anticipatory switch F1 (**R-EVAL-1**) and duration accuracy (**R-EVAL-2**) on the full **test** split, across 13
+English–X pairs (**R-EVAL-4**):
 
 | pair | switch F1 | dur acc |
 |---|---:|---:|
-| en-ar  | **0.793** | 0.576 |
-| en-hi  | **0.658** | 0.570 |
-| en-yue | **0.496** | 0.635 |
-| en-zh  | **0.486** | 0.742 |
-| en-ja  | **0.386** | 0.625 |
-| en-ko  | **0.784** | 0.637 |
-| en-ru  | **0.618** | 0.494 |
-| en-es  | **0.740** | 0.735 |
-| en-fr  | **0.783** | 0.642 |
-| en-de  | **0.825** | 0.724 |
-| en-vi  | **0.765** | 0.640 |
-| en-ms  | **0.604** | 0.578 |
-| en-fil | **0.478** | 0.519 |
+| en-ar  | **0.716** | 0.602 |
+| en-hi  | **0.667** | 0.652 |
+| en-yue | **0.555** | 0.674 |
+| en-zh  | **0.579** | 0.738 |
+| en-ja  | **0.612** | 0.787 |
+| en-ko  | **0.817** | 0.689 |
+| en-ru  | **0.683** | 0.648 |
+| en-es  | **0.703** | 0.674 |
+| en-fr  | **0.790** | 0.679 |
+| en-de  | **0.747** | 0.675 |
+| en-vi  | **0.693** | 0.674 |
+| en-ms  | **0.633** | 0.628 |
+| en-fil | **0.479** | 0.536 |
 
-Mean switch F1 = **0.647**, σ_universality (sample, ddof=1) = **0.147**. The model beats the token-lookup
-baseline on switch F1; the lowest-F1 pairs (ja / zh / yue / fil) are the CJK / low-resource scripts where
-word-level LID and segmentation are hardest.
+Mean switch F1 = **0.667**, σ_universality (sample, ddof=1) = **0.095** (**R-EVAL-5**). The model beats the
+token-lookup baseline (0.610) on switch F1 and is far more even across pairs; the lowest-F1 pairs (fil / yue / zh)
+are the low-resource / CJK scripts where word-level LID and segmentation are hardest.
+
+Macro-average across switch types, all pairs pooled (**R-EVAL-3**):
+
+| switch type | switch F1 | dur acc | dur macro-F1 |
+|---|---:|---:|---:|
+| inter-sentential | 0.718 | 0.768 | 0.609 |
+| intra-sentential | 0.554 | 0.559 | 0.525 |
+| extra-sentential / tag | 0.707 | 0.693 | 0.564 |
+| **macro-average** | **0.659** | **0.673** | **0.566** |
+
+Intra-sentential switches (a switch inside one sentence) are the hardest for both metrics, as expected.
 
 ## mBERT multitask model (Update 2)
 
 Same dual-head architecture, loss and training settings as the XLM-R model above (`switch_pos_weight = 8`,
-`λ_dur = 0.5`, `lr = 2e-5`, 1,500 optimizer steps of 8 × 4 windows), with `bert-base-multilingual-cased` as the
+`λ_dur = 0.5`, `lr = 2e-5`, 6,000 optimizer steps of 8 × 4 windows), with `bert-base-multilingual-cased` as the
 shared encoder. The mBERT tokenizer is extended with 241 train-split Han characters it cannot encode (`MBERT_ADDED`,
 mostly Cantonese), and the embedding matrix is resized to match (119,788 entries). The code is in notebook Section 6,
 "mBERT multitask model"; the model was trained on a Colab T4 GPU.
 
-Anticipatory switch F1 and duration accuracy on the first 300 **test** batches (19,200 positions):
+Anticipatory switch F1 and duration accuracy on the full **test** split:
 
 | pair | switch F1 | dur acc |
 |---|---:|---:|
-| en-ar  | **0.774** | 0.531 |
-| en-hi  | **0.663** | 0.238 |
-| en-yue | **0.506** | 0.635 |
-| en-zh  | **0.566** | 0.716 |
-| en-ja  | **0.347** | 0.609 |
-| en-ko  | **0.821** | 0.655 |
-| en-ru  | **0.561** | 0.428 |
-| en-es  | **0.655** | 0.635 |
-| en-fr  | **0.734** | 0.581 |
-| en-de  | **0.802** | 0.630 |
-| en-vi  | **0.777** | 0.570 |
-| en-ms  | **0.585** | 0.465 |
-| en-fil | **0.468** | 0.281 |
+| en-ar  | **0.721** | 0.600 |
+| en-hi  | **0.623** | 0.697 |
+| en-yue | **0.538** | 0.648 |
+| en-zh  | **0.605** | 0.698 |
+| en-ja  | **0.621** | 0.757 |
+| en-ko  | **0.824** | 0.665 |
+| en-ru  | **0.682** | 0.614 |
+| en-es  | **0.716** | 0.654 |
+| en-fr  | **0.809** | 0.678 |
+| en-de  | **0.743** | 0.673 |
+| en-vi  | **0.689** | 0.674 |
+| en-ms  | **0.605** | 0.594 |
+| en-fil | **0.495** | 0.497 |
 
-Mean switch F1 = **0.635**, σ_universality (sample, ddof=1) = **0.145**; mean duration accuracy = 0.536, lowest for
-en-hi and en-fil. The first 300 batches cover different rows and positions than in the XLM-R evaluation (mBERT has
-one token per Han character), so the two tables are not directly comparable yet.
+Mean switch F1 = **0.667**, σ_universality (sample, ddof=1) = **0.098**. Macro-average across switch types
+(**R-EVAL-3**), all pairs pooled:
+
+| switch type | switch F1 | dur acc | dur macro-F1 |
+|---|---:|---:|---:|
+| inter-sentential | 0.713 | 0.760 | 0.541 |
+| intra-sentential | 0.545 | 0.553 | 0.474 |
+| extra-sentential / tag | 0.708 | 0.675 | 0.527 |
+| **macro-average** | **0.655** | **0.662** | **0.514** |
+
+Both models are now scored on the full test split, so the two tables are directly comparable. They tie on mean
+switch F1 (0.667); XLM-R has the slightly lower σ_universality (0.095 vs 0.098), i.e. the marginally more
+"universal" predictor (**R-EVAL-5**). mBERT emits one token per Han character, so its position counts (`n`,
+printed in the notebook) are higher for yue / zh / ja, but the underlying test rows are the same.
 
 The checkpoint (`checkpoints/mbert_multitask.pt`, 680 MB) and the extended tokenizer (`checkpoints/mbert_tokenizer`)
 are not in the repository (`checkpoints/` is git-ignored).
