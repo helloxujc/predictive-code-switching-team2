@@ -6,7 +6,7 @@ CS6140 Machine Learning
 
 **Project Update 2 submission**
 
-The goal is to predict, from the historical prefix `x_1, ..., x_t` only, (i) whether the next token `x_{t+1}` belongs to a different language than `x_t` (binary **switch** label `y_sw`) and (ii) the length bin of the upcoming same-language burst (3-class **duration** label `y_dur` ∈ {0: 1–2 tok, 1: 3–6 tok, 2: 7+ tok}). We evaluate universality across six typologically diverse English–X pairs on the SwitchLingua corpus.
+The goal is to predict, from the historical prefix `x_1, ..., x_t` only, (i) whether the next token `x_{t+1}` belongs to a different language than `x_t` (binary **switch** label `y_sw`) and (ii) the length bin of the upcoming same-language burst (3-class **duration** label `y_dur` ∈ {0: 1–2 tok, 1: 3–6 tok, 2: 7+ tok}). We evaluate universality across 13 typologically diverse English–X pairs on the SwitchLingua corpus.
 
 ## Repository contents
 
@@ -17,14 +17,21 @@ The goal is to predict, from the historical prefix `x_1, ..., x_t` only, (i) whe
 
 ## Language pairs
 
-Six English–X pairs chosen to span scripts, families and resource levels:
+13 English–X pairs spanning different scripts and language families:
 
 - **en–ar** (Arabic, Semitic, RTL, script-based LID)
-- **en–hi** (Indo-Aryan, SOV, Devanagari — romanized Hinglish rows dropped)
+- **en–hi** (Indo-Aryan, SOV, Devanagari and romanized Hinglish; romanized rows retained with improved LID)
 - **en–yue** (Cantonese, Sinitic, low-resource, Han characters)
 - **en–ko** (Koreanic, agglutinative, SOV, Hangul)
 - **en–es** (Romance, Latin script, frequency-based LID)
 - **en–de** (Germanic, Latin script, frequency-based LID)
+- **en–zh** (Mandarin Chinese, Han characters)
+- **en–ja** (Japanese, mixed scripts)
+- **en–ru** (Russian, Cyrillic)
+- **en–fr** (French, Latin script)
+- **en–vi** (Vietnamese, Latin script)
+- **en–ms** (Malay, Latin script)
+- **en–fil** (Filipino, Latin script)
 
 ## Pipeline (Update 1)
 
@@ -37,7 +44,7 @@ SwitchLingua text (single- + multi-turn)
   → Streaming DataLoader yielding left-padded prefix windows [x_{t-N+1}, ..., x_t]
 ```
 
-**Causal / prefix-only constraint.** Every training example is a left-padded prefix window ending at `t`, and the label is for `x_{t+1}`. When the backbone encoder is plugged in (Update 2), a causal attention mask (lower-triangular) will enforce that position `t` cannot attend to any `t' > t`.
+**Causal / prefix-only constraint.** Every training example is a left-padded prefix window ending at `t`, and the label is for `x_{t+1}`. In Update 2, the encoder receives only the observed prefix, so future tokens are excluded by the input window itself; no causal attention mask is used.
 
 **Multi-turn dialogues.** Each speaker turn is labeled independently and the turns are joined with `</s>`, so prior turns act as prefix context. The last word of every turn is masked (`-100`) because the next token belongs to the other speaker and a change there reflects a speaker switch, not a code-switch.
 
@@ -45,7 +52,7 @@ SwitchLingua text (single- + multi-turn)
 
 Token-lookup baseline: on the train split, estimate `P(switch | x_t)` for each sub-word id (add-one smoothed toward the global switch rate); predict switch when the probability exceeds a threshold tuned for F1 on val; unseen tokens get the global rate.
 
-Anticipatory F1 of the switch class on the **test** split:
+Historical Update 1 anticipatory F1 of the switch class on the **test** split (six pairs):
 
 | pair | switch % | F1 always-switch | **F1 token-lookup** |
 |---|---:|---:|---:|
@@ -56,7 +63,9 @@ Anticipatory F1 of the switch class on the **test** split:
 | en-ko  | 11.47 | 0.206 | **0.752** |
 | en-de  |  8.30 | 0.153 | **0.650** |
 
-Mean F1 = **0.610**, σ_universality (sample, ddof=1) = **0.126**.
+Update 1 mean F1 = **0.610**, σ_universality (sample, ddof=1) = **0.126** (six pairs).
+
+**Updated Update 2 baseline across all 13 pairs:** mean F1 = **0.579**, σ_universality (sample, ddof=1) = **0.104**. The historical table above is retained for comparison with Update 1.
 
 Across all pairs a switch is 6–20× more likely right after punctuation than after non-punctuation tokens, so the baseline mostly fires at clause / sentence boundaries. See notebook Section 8 for per-pair precision/recall and top switch-triggering tokens.
 
@@ -89,8 +98,7 @@ English–X pairs (**R-EVAL-4**):
 | en-fil | **0.479** | 0.536 |
 
 Mean switch F1 = **0.667**, σ_universality (sample, ddof=1) = **0.095** (**R-EVAL-5**). The model beats the
-token-lookup baseline (0.610) on switch F1 and is far more even across pairs; the lowest-F1 pairs (fil / yue / zh)
-are the low-resource / CJK scripts where word-level LID and segmentation are hardest.
+updated 13-pair token-lookup baseline (0.579) on switch F1 and is slightly more consistent across pairs (σ 0.095 vs. 0.104). The lowest-F1 pairs are en-fil, en-yue, and en-zh; LID and tokenization differences may contribute, but require further analysis.
 
 Macro-average across switch types, all pairs pooled (**R-EVAL-3**):
 
@@ -163,20 +171,20 @@ huggingface-cli login
 uv run jupyter lab streaming_dataloader.ipynb
 ```
 
-Then run the cells top-to-bottom. The notebook is self-contained: it loads SwitchLingua, builds the splits, generates labels, aligns to XLM-R sub-words, materializes the streaming DataLoader, and reports the baseline numbers above.
+Then run the cells top-to-bottom. The notebook loads SwitchLingua, builds the splits, generates labels, aligns sub-words, and includes the baseline and Update 2 multitask experiments. Training the models requires substantial GPU time; the mBERT checkpoint and tokenizer are not included in the repository.
 
 ## Plan for Next
 
-So far we have built the data preprocessing pipeline, generated switch and duration labels, implemented a prefix-only streaming DataLoader, and evaluated a token-lookup baseline. In the coming weeks we plan to:
+So far we have expanded the pipeline to 13 language pairs, improved Romanized Hindi labeling, trained XLM-R and mBERT multitask models, and evaluated both on the full test split. Next we plan to:
 
-**Improve data preprocessing and label quality.**
-- Improve handling of Romanized Hindi, ambiguous words, and Chinese-character segmentation.
-- Expand experiments to at least 12 language pairs.
+**Improve training efficiency and convergence analysis.**
+- Replace repeated prefix encoding with longer sequence passes using causal attention masks where appropriate, and train for more steps. Each current model has processed only about 5% of one pass through the training pool.
+- Log averaged training losses and validation metrics. Current loss curves fluctuate partly because each logged value comes from a single micro-batch of eight windows; zero duration loss can occur when a batch contains no switches.
 
-**Implement and train multitask models (XLM-R, mBERT).**
-- Shared multilingual backbone with separate heads for switch and duration prediction.
-- Combined loss function with causal constraints to prevent future information leakage.
+**Evaluate multitask learning and data partitions.**
+- Compare joint multitask training against single-task models.
+- Test punctuation kept vs. stripped and single-turn vs. multi-turn settings; explore window lengths and other partitions if time permits.
 
-**Evaluate predictive accuracy and universality.**
-- Switch: precision / recall / anticipatory F1; Duration: accuracy and macro-F1.
-- Universality: standard deviation of pair-specific F1 across language pairs, with intra- vs. inter-sentential switches analyzed separately.
+**Analyze difficult cases.**
+- Investigate intra-sentential switches and weaker language pairs (en-fil, en-yue, en-zh).
+- Report switch F1, duration accuracy, and cross-language F1 variation, including error examples.
